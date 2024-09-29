@@ -1,3 +1,4 @@
 [submodule "src/Serendipy"]
 	path = src/Serendipy
 	url = https://github.com/Anti-Raid/Serendipy
+	branch = production
