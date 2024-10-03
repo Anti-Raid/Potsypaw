@@ -1,183 +1,176 @@
 // Packages
-import Fastify from "fastify";
-import FastifyRateLimit from "@fastify/rate-limit";
-import FastifyRedis from "@fastify/redis";
-import FastifyMultipart from "@fastify/multipart";
-import FastifyCors from "@fastify/cors";
-import FastifyCompress from "@fastify/compress";
-import { RedisClient, CacheManager } from "./cache/index";
-import { Metadata } from "./database/index";
-import { S3, GetObjectCommand } from "@aws-sdk/client-s3";
-import { Readable } from "stream";
-import * as crypto from "crypto";
-import * as path from "path";
-import * as Logger from "./logger";
+import fs from "node:fs";
+import firebase from "firebase-admin";
+import serviceAccount from "./firebaseService.js";
+import path from "path";
 import * as database from "./Serendipy/prisma.js";
 import * as rpc from "./Serendipy/rpc.js";
 import * as auth from "./auth.js";
 import * as perms from "./perms.js";
+import cors from "@fastify/cors";
+import ratelimit from "@fastify/rate-limit";
+import swagger from "@fastify/swagger";
+import ui from "@fastify/swagger-ui";
 import "dotenv/config";
+import Fastify, { FastifyInstance } from "fastify";
 
-// Servers
-const publicServer = Fastify();
-const admin = Fastify();
-
-// Server Middleware (public)
-publicServer.register(FastifyCors);
-publicServer.register(FastifyCompress, { threshold: 0 });
-publicServer.register(FastifyRateLimit, {
-  max: 20,
-  timeWindow: "1 minute",
-  redis: RedisClient,
-  keyGenerator: (req) => req.ip,
-  allowList: ["/upload"],
-});
-publicServer.register(FastifyRedis, { client: RedisClient });
-publicServer.register(FastifyMultipart);
-
-// Server Middleware (admin)
-admin.register(FastifyCors);
-admin.register(FastifyCompress, { threshold: 0 });
-
-// AWS Configuration
-const s3 = new S3({
-  endpoint: process.env.S3_ENDPOINT,
-  region: "any",
-  forcePathStyle: true,
-  credentials: {
-    accessKeyId: process.env.S3_KEY,
-    secretAccessKey: process.env.S3_SECRET,
-  },
+// Initialize Firebase Admin
+firebase.initializeApp({
+	credential: firebase.credential.cert(
+		serviceAccount as firebase.ServiceAccount
+	),
 });
 
-// Public Routes
-publicServer.get("/:file", async (req, reply) => {
-  const { file } = req.params as { file: string };
-
-  try {
-    const command = new GetObjectCommand({
-      Bucket: "popkat",
-      Key: file,
-    });
-    const item = await s3.send(command);
-    const readStream = item.Body as Readable;
-
-    reply.raw.setHeader("Content-Type", item.ContentType);
-    readStream.pipe(reply.raw);
-  } catch (error) {
-    reply.status(500).send(error);
-  }
+// Middleware
+const app: FastifyInstance = Fastify({
+	logger: true,
 });
 
-publicServer.get("/:file/meta", async (req, reply) => {
-  const { file } = req.params as { file: string };
-
-  try {
-    const cache = await CacheManager.get(`${file}/meta`);
-
-    if (cache) {
-      reply.status(200).send(JSON.parse(cache));
-    } else {
-      const metadata = await Metadata.get({ key: file });
-
-      await CacheManager.setEX(`${file}/meta`, 4, JSON.stringify(metadata));
-      reply.status(200).send(metadata);
-    }
-  } catch (error) {
-    reply.status(500).send(error);
-  }
+app.register(cors, {
+	origin: "*",
+	allowedHeaders: [
+		"secret",
+		"userid",
+		"Authorization",
+		"Authorization",
+		"Content-Type",
+		"Content-Disposition",
+		"Content-Length",
+	],
+	methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+	credentials: true,
+	optionsSuccessStatus: 200,
+	preflight: true,
+	strictPreflight: false,
 });
 
-// File Upload Route
-publicServer.post("/upload", async (req, reply) => {
-  const parts = await req.file();
-  const fileName = `${crypto
-    .createHash("md5")
-    .update(parts.filename)
-    .digest("hex")}_${new Date().getUTCMilliseconds()}${path
-    .extname(parts.filename)
-    .toLowerCase()}`;
-
-  try {
-    const data = await s3.putObject({
-      Bucket: "popkat",
-      Key: fileName,
-      Body: parts.file,
-      ACL: "public-read",
-    });
-
-    await Metadata.create({
-      key: fileName,
-      userID: req.headers["userid"] || "unknown",
-      platform: req.headers["platform"] || "unknown",
-      fileType: parts.mimetype,
-      fileSize: parts.file.truncated ? parts.file.truncated : undefined,
-    });
-
-    reply.status(200).send({ key: fileName });
-  } catch (error) {
-    reply.status(500).send(error);
-  }
+app.register(swagger, {
+	swagger: {
+		info: {
+			title: "AntiRaid Forums",
+			description:
+				"AntiRaid Forums is an official support community that helps each other with using our services.",
+			version: "0.0.1",
+		},
+		host:
+			process.env.ENV === "production"
+				? "potsypaw.antiraid.xyz"
+				: `localhost:${process.env.PORT}`,
+		schemes: ["http"],
+		consumes: ["application/json"],
+		produces: ["application/json"],
+		tags: [
+			{
+				name: "users",
+				description: "Endpoints for accessing our User database.",
+			},
+			{
+				name: "posts",
+				description: "Endpoints for accessing our Posts database.",
+			},
+			{
+				name: "partners",
+				description: "Endpoints for accessing partner data.",
+			},
+			{
+				name: "@me",
+				description:
+					"Endpoints for accessing your own personal information.",
+			},
+			{
+				name: "validate",
+				description:
+					"Endpoints for validating user data before continuing API Use.",
+			},
+		],
+		securityDefinitions: {
+			apiKey: {
+				type: "apiKey",
+				name: "Authorization",
+				in: "header",
+			},
+		},
+	},
+	hideUntagged: false,
 });
 
-// Admin Routes
-admin.delete("/delete", async (req, reply) => {
-  const key = req.headers["key"] as string;
-
-  if (!key) {
-    return reply.status(500).json({
-      message: "Missing key in Header",
-    });
-  }
-
-  try {
-    const metadata = await Metadata.get({ key });
-
-    if (metadata) {
-      let success = await Metadata.delete({ key });
-
-      if (success) {
-        success = false;
-
-        await CacheManager.delete(`${key}/meta`);
-
-        await s3
-          .deleteObject({ Bucket: "popkat", Key: key })
-          .then(() => (success = true))
-          .catch((err) => {
-            throw new Error(err);
-          });
-
-        if (success) {
-          return reply.status(200).json({ success: true });
-        } else {
-          throw new Error("Unexpected error deleting the key");
-        }
-      } else {
-        throw new Error("Unexpected error deleting the key");
-      }
-    } else {
-      throw new Error("Key not found.");
-    }
-  } catch (error) {
-    return reply.status(500).send(error);
-  }
+app.register(ui, {
+	routePrefix: "/",
+	uiConfig: {
+		docExpansion: "full",
+		deepLinking: true,
+	},
+	uiHooks: {
+		onRequest: (request, reply, next) => {
+			next();
+		},
+		preHandler: (request, reply, next) => {
+			next();
+		},
+	},
+	staticCSP: true,
+	transformStaticCSP: (header) => header,
+	transformSpecification: (swaggerObject, request, reply) => {
+		return swaggerObject;
+	},
+	transformSpecificationClone: true,
 });
 
-// Expose Server (public)
-publicServer.listen({ port: parseInt(process.env.PORT) }, (err, address) => {
-  if (err) {
-    Logger.error("Server (public)", err);
-    process.exit(1);
-  }
-  Logger.debug("Server (public)", `Listening on ${address}`);
+app.register(ratelimit, {
+	global: true,
+	max: 50,
+	timeWindow: 1000,
 });
 
-// Expose Server (admin)
-admin.listen({ port: parseInt(process.env.ADMIN_PORT) }, (err, address) => {
-  if (err) {
-    Logger.error("Server (admin)", err);
-    process.exit(1);
-  }
-  Logger.debug("Server (admin)", `Listening on ${address}`);
+app.addHook("preHandler", (req, res, done) => {
+	res.header("Access-Control-Allow-Origin", "*");
+	res.header("Access-Control-Allow-Headers", "*");
+	res.header("Access-Control-Allow-Methods", "*");
+	res.header("Access-Control-Allow-Credentials", "true");
+
+	done();
 });
+
+// API Endpoints Map
+const getFilesInDirectory = (dir: string) => {
+	let files: string[] = [];
+	const filesInDir = fs.readdirSync(dir);
+
+	for (const file of filesInDir) {
+		const filePath = path.join(dir, file);
+		const stat = fs.statSync(filePath);
+
+		if (stat.isDirectory())
+			files = files.concat(getFilesInDirectory(filePath));
+		else files.push(filePath);
+	}
+
+	return files;
+};
+
+// API Endpoints
+const apiEndpointsFiles = getFilesInDirectory("./dist/endpoints").filter(
+	(file) => file.endsWith(".js")
+);
+
+for (const file of apiEndpointsFiles) {
+	import(`../${file}`)
+		.then(async (module) => {
+			await app.route(module.default);
+		})
+		.catch((error) => {
+			console.error(`Error importing ${file}: ${error}`);
+		});
+}
+
+setTimeout(() => {
+	// Swagger
+	app.ready(() => {
+		app.swagger();
+	});
+
+	// Start Server
+	app.listen({ port: Number(process.env.PORT) }, (err) => {
+		if (err) throw err;
+	});
+}, 8000);
