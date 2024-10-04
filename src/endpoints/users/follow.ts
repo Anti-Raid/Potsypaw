@@ -42,12 +42,15 @@ export default {
 							error: "You cannot follow this user again.",
 						});
 					else {
-                        if ((user.state as State) === State.BANNED || (user.state as State) === State.FOLLOW_BANNED) {
-                            return reply.send({
-                                error: "You cannot follow this user, as you have been banned (or Follow Banned) for violating our Community Guidelines."
-                            });
-                        }        
-                        
+						if (
+							(user.state as State) === State.BANNED ||
+							(user.state as State) === State.FOLLOW_BANNED
+						) {
+							return reply.send({
+								error: "You cannot follow this user, as you have been banned (or Follow Banned) for violating our Community Guidelines.",
+							});
+						}
+
 						const update = await database.Users.follow(
 							user.userid,
 							target.userid
@@ -84,11 +87,14 @@ export default {
 							error: "You cannot unfollow this user. Reason: You are not following to this user.",
 						});
 					else {
-                        if ((user.state as State) === State.BANNED || (user.state as State) === State.FOLLOW_BANNED) {
-                            return reply.send({
-                                error: "You cannot unfollow this user, as you have been banned (or Follow Banned) for violating our Community Guidelines."
-                            });
-                        }   
+						if (
+							(user.state as State) === State.BANNED ||
+							(user.state as State) === State.FOLLOW_BANNED
+						) {
+							return reply.send({
+								error: "You cannot unfollow this user, as you have been banned (or Follow Banned) for violating our Community Guidelines.",
+							});
+						}
 
 						const update = await database.Users.unfollow(
 							user.userid,

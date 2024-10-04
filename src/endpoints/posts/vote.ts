@@ -1,7 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import * as database from "../../Serendipy/prisma.js";
 import { getAuth } from "../../auth.js";
-import { State } from "../../Serendipy/types/prismaTypes.js";
 
 export default {
 	url: "/posts/vote",
@@ -30,45 +29,54 @@ export default {
 		const user = await getAuth(Authorization, "posts.vote");
 
 		let post = await database.Posts.get(PostID);
-        
 
 		if (type === "up") {
 			if (user) {
 				if (post) {
-                    if ((post.user.state as State) === State.BANNED || (post.user.state as State) === State.VOTE_BANNED) {
-                        return reply.send({
-                            error: "You cannot vote for this post, as you have been banned (or Vote Banned) for violating our Community Guidelines."
-                        });
-                    }                    
-
 					if (
-						post.upvotes.find((a) => a.userid === user.userid) ||
-						post.downvotes.find((a) => a.userid === user.userid)
-					)
+						post.user.state === "BANNED" ||
+						post.user.state === "VOTE_BANNED"
+					) {
 						return reply.send({
-							error: "You cannot update your vote, for this post.",
+							success: false,
+							error: "You cannot vote for this post, as you have been banned (or Vote Banned) for violating our Community Guidelines.",
 						});
-					else {
-						const update = await database.Posts.upvote(
-							PostID,
-							user.userid
-						);
+					} else {
+						if (
+							post.upvotes.find(
+								(a) => a.userid === user.userid
+							) ||
+							post.downvotes.find((a) => a.userid === user.userid)
+						)
+							return reply.send({
+								success: false,
+								error: "You cannot update your vote, for this post.",
+							});
+						else {
+							const update = await database.Posts.upvote(
+								PostID,
+								user.userid
+							);
 
-						if (update)
-							return reply.send({
-								success: true,
-							});
-						else
-							return reply.send({
-								error: "An unexpected error has occured while trying to complete your request.",
-							});
+							if (update)
+								return reply.send({
+									success: true,
+								});
+							else
+								return reply.send({
+									success: false,
+									error: "An unexpected error has occured while trying to complete your request.",
+								});
+						}
 					}
 				} else
 					return reply.send({
 						error: "The provided post id is invalid.",
+						success: false,
 					});
 			} else
 				return reply.send({
+					success: false,
 					error: "The provided user token is invalid, or the user does not exist.",
 				});
 		}
@@ -76,40 +84,50 @@ export default {
 		if (type === "down") {
 			if (user) {
 				if (post) {
-                    if ((post.user.state as State) === State.BANNED || (post.user.state as State) === State.VOTE_BANNED) {
-                        return reply.send({
-                            error: "You cannot vote for this post, as you have been banned (or Vote Banned) for violating our Community Guidelines."
-                        });
-                    }
-                    
 					if (
-						post.upvotes.find((a) => a.userid === user.userid) ||
-						post.downvotes.find((a) => a.userid === user.userid)
-					)
+						post.user.state === "BANNED" ||
+						post.user.state === "VOTE_BANNED"
+					) {
 						return reply.send({
-							error: "You cannot update your vote, for this post.",
+							success: false,
+							error: "You cannot vote for this post, as you have been banned (or Vote Banned) for violating our Community Guidelines.",
 						});
-					else {
-						const update = await database.Posts.downvote(
-							PostID,
-							user.userid
-						);
+					} else {
+						if (
+							post.upvotes.find(
+								(a) => a.userid === user.userid
+							) ||
+							post.downvotes.find((a) => a.userid === user.userid)
+						)
+							return reply.send({
+								success: false,
+								error: "You cannot update your vote, for this post.",
+							});
+						else {
+							const update = await database.Posts.downvote(
+								PostID,
+								user.userid
+							);
 
-						if (update)
-							return reply.send({
-								success: true,
-							});
-						else
-							return reply.send({
-								error: "An unexpected error has occured while trying to complete your request.",
-							});
+							if (update)
+								return reply.send({
+									success: true,
+								});
+							else
+								return reply.send({
+									success: false,
+									error: "An unexpected error has occured while trying to complete your request.",
+								});
+						}
 					}
 				} else
 					return reply.send({
+						success: false,
 						error: "The provided post id is invalid.",
 					});
 			} else
 				return reply.send({
+					success: false,
 					error: "The provided user token is invalid, or the user does not exist.",
 				});
 		}
