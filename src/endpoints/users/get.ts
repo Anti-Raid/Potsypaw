@@ -22,7 +22,14 @@ export default {
 		const tag = data.tag;
 		let user = await database.Users.get({ usertag: tag });
 
-		if (user) return reply.send(user);
+		if (user) {
+            if (user.state === "BANNED") return reply.send({
+                message: "This user has been banned for violating our Community Guidelines.",
+                error: true
+            });
+            
+            return reply.send(user);
+        }
 		else
 			return reply.status(404).send({
 				message:

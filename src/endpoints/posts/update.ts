@@ -51,6 +51,11 @@ export default {
 								error: "Sorry, a caption must be provided.",
 							});
 
+                        if (origPost.user.state != "BANNED") return reply.send({
+                            success: false,
+                            error: "Sorry, you cannot edit this post; as you have been banned for violating the Community Guidelines."
+                        });
+
 						await database.Posts.updatePost(data["post_id"], {
 							caption: data["caption"],
 							image: data["image"] || null,

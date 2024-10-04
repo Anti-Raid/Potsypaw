@@ -11,7 +11,6 @@ export default {
 	},
 	handler: async (request: FastifyRequest, reply: FastifyReply) => {
 		let posts = await database.Posts.listAllPosts();
-
-		return reply.send(posts);
+		return reply.send(posts.filter((p) => p.user.state != "BANNED"));
 	},
 };

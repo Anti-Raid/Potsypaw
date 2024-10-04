@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import * as database from "../../Serendipy/prisma.js";
 import { getAuth } from "../../auth.js";
+import { State } from "../../Serendipy/types/prismaTypes.js";
 
 export default {
 	url: "/posts/vote",
@@ -29,10 +30,17 @@ export default {
 		const user = await getAuth(Authorization, "posts.vote");
 
 		let post = await database.Posts.get(PostID);
+        
 
 		if (type === "up") {
 			if (user) {
 				if (post) {
+                    if ((post.user.state as State) === State.BANNED || (post.user.state as State) === State.VOTE_BANNED) {
+                        return reply.send({
+                            error: "You cannot vote for this post, as you have been banned (or Vote Banned) for violating our Community Guidelines."
+                        });
+                    }                    
+
 					if (
 						post.upvotes.find((a) => a.userid === user.userid) ||
 						post.downvotes.find((a) => a.userid === user.userid)
@@ -68,6 +76,12 @@ export default {
 		if (type === "down") {
 			if (user) {
 				if (post) {
+                    if ((post.user.state as State) === State.BANNED || (post.user.state as State) === State.VOTE_BANNED) {
+                        return reply.send({
+                            error: "You cannot vote for this post, as you have been banned (or Vote Banned) for violating our Community Guidelines."
+                        });
+                    }
+                    
 					if (
 						post.upvotes.find((a) => a.userid === user.userid) ||
 						post.downvotes.find((a) => a.userid === user.userid)

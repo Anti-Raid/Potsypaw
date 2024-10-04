@@ -41,6 +41,12 @@ export default {
 
 		if (user) {
 			if (post) {
+                if (post.user.state === "BANNED") {
+                    return reply.send({
+                        error: "You cannot comment on this post, as you have been banned for violating our Community Guidelines."
+                    });
+                }
+
 				const update = await database.Posts.comment(
 					post.postid,
 					user.userid,
