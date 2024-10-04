@@ -26,10 +26,12 @@ export default {
 			let user = await database.Users.get({ usertag: tag });
 
 			if (user) {
-                if (user.state === "BANNED") return reply.status(404).send({
-                    message: "This user has been banned, for violating our community guidelines.",
-                    error: true
-                });
+				if (user.state === "BANNED")
+					return reply.status(404).send({
+						message:
+							"This user has been banned, for violating our community guidelines.",
+						error: true,
+					});
 
 				posts = await database.Posts.getAllUserPosts(user.userid);
 				posts.reverse();

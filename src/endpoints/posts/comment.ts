@@ -41,24 +41,24 @@ export default {
 
 		if (user) {
 			if (post) {
-                if (post.user.state === "BANNED") {
-                    return reply.send({
-                        error: "You cannot comment on this post, as you have been banned for violating our Community Guidelines."
-                    });
-                }
-
-				const update = await database.Posts.comment(
-					post.postid,
-					user.userid,
-					data["caption"],
-					data["image"]
-				);
-
-				if (update) return reply.send({ success: true });
-				else
+				if (post.user.state === "BANNED") {
 					return reply.send({
-						error: "Something went wrong with processing your request.",
+						error: "You cannot comment on this post, as you have been banned for violating our Community Guidelines.",
 					});
+				} else {
+					const update = await database.Posts.comment(
+						post.postid,
+						user.userid,
+						data["caption"],
+						data["image"]
+					);
+
+					if (update) return reply.send({ success: true });
+					else
+						return reply.send({
+							error: "Something went wrong with processing your request.",
+						});
+				}
 			} else
 				return reply.send({
 					error: "The provided post id is invalid.",

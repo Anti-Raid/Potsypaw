@@ -37,20 +37,22 @@ export default {
 			const user = await getAuth(Authorization, "posts.write");
 
 			if (user) {
-                if (user.state == "BANNED") return reply.send({
-                    success: false,
-                    error: "You cannot post to AntiRaid Forums. Reason: Banned for violating Community Guidelines!"
-                });
-                
-				await database.Posts.createPost(
-					user.userid,
-					data["caption"],
-					data["type"],
-					data["image"],
-					data["plugins"]
-				);
+				if (user.state == "BANNED") {
+					return reply.send({
+						success: false,
+						error: "You cannot post to AntiRaid Forums. Reason: Banned for violating Community Guidelines!",
+					});
+				} else {
+					await database.Posts.createPost(
+						user.userid,
+						data["caption"],
+						data["type"],
+						data["image"],
+						data["plugins"]
+					);
 
-				return reply.send({ success: true });
+					return reply.send({ success: true });
+				}
 			} else {
 				return reply.send({
 					success: false,
