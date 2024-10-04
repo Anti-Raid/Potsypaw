@@ -34,8 +34,8 @@ export default {
 			if (user) {
 				if (post) {
 					if (
-						post.user.state === "BANNED" ||
-						post.user.state === "VOTE_BANNED"
+						user.state === "BANNED" ||
+						user.state === "VOTE_BANNED"
 					) {
 						return reply.send({
 							success: false,
@@ -85,8 +85,8 @@ export default {
 			if (user) {
 				if (post) {
 					if (
-						post.user.state === "BANNED" ||
-						post.user.state === "VOTE_BANNED"
+						user.state === "BANNED" ||
+						user.state === "VOTE_BANNED"
 					) {
 						return reply.send({
 							success: false,

@@ -41,7 +41,7 @@ export default {
 
 		if (user) {
 			if (post) {
-				if (post.user.state === "BANNED") {
+				if (user.state === "BANNED") {
 					return reply.send({
 						error: "You cannot comment on this post, as you have been banned for violating our Community Guidelines.",
 					});

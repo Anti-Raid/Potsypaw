@@ -37,7 +37,7 @@ export default {
 			const user = await getAuth(Authorization, "posts.write");
 
 			if (user) {
-				if (user.state == "BANNED") {
+				if (user.state === "BANNED") {
 					return reply.send({
 						success: false,
 						error: "You cannot post to AntiRaid Forums. Reason: Banned for violating Community Guidelines!",
