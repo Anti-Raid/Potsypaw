@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import * as database from "../../Serendipy/prisma.js";
 import { getAuth } from "../../auth.js";
+import { State } from "../../Serendipy/types/prismaTypes.js";
 
 export default {
 	url: "/users/follow",
@@ -41,6 +42,12 @@ export default {
 							error: "You cannot follow this user again.",
 						});
 					else {
+                        if ((user.state as State) === State.BANNED || (user.state as State) === State.FOLLOW_BANNED) {
+                            return reply.send({
+                                error: "You cannot follow this user, as you have been banned (or Follow Banned) for violating our Community Guidelines."
+                            });
+                        }        
+                        
 						const update = await database.Users.follow(
 							user.userid,
 							target.userid
@@ -77,6 +84,12 @@ export default {
 							error: "You cannot unfollow this user. Reason: You are not following to this user.",
 						});
 					else {
+                        if ((user.state as State) === State.BANNED || (user.state as State) === State.FOLLOW_BANNED) {
+                            return reply.send({
+                                error: "You cannot unfollow this user, as you have been banned (or Follow Banned) for violating our Community Guidelines."
+                            });
+                        }   
+
 						const update = await database.Users.unfollow(
 							user.userid,
 							target.userid
